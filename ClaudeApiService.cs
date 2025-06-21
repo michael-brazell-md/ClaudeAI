@@ -2,8 +2,8 @@
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 using System.Collections.Generic;
+using System.Web.Script.Serialization;
 
 namespace ClaudeAI
 {
@@ -35,7 +35,7 @@ namespace ClaudeAI
             {
                 var requestData = new
                 {
-                    model = "claude-3-sonnet-20240229",
+                    model = "claude-3-5-sonnet-20241022",
                     max_tokens = 1000,
                     messages = new[]
                     {
@@ -47,7 +47,8 @@ namespace ClaudeAI
                     }
                 };
 
-                var json = JsonConvert.SerializeObject(requestData);
+                var serializer = new JavaScriptSerializer();
+                var json = serializer.Serialize(requestData);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
                 var response = await httpClient.PostAsync(API_BASE_URL, content);
@@ -55,14 +56,10 @@ namespace ClaudeAI
                 if (response.IsSuccessStatusCode)
                 {
                     var responseJson = await response.Content.ReadAsStringAsync();
-                    var responseData = JsonConvert.DeserializeObject<ClaudeResponse>(responseJson);
 
-                    if (responseData?.Content?.Length > 0)
-                    {
-                        return responseData.Content[0].Text;
-                    }
-
-                    return "Sorry, I couldn't process your request.";
+                    // Manual JSON parsing to avoid Newtonsoft.Json dependency
+                    var responseText = ExtractTextFromResponse(responseJson);
+                    return !string.IsNullOrEmpty(responseText) ? responseText : "Sorry, I couldn't process your request.";
                 }
                 else
                 {
@@ -76,49 +73,65 @@ namespace ClaudeAI
             }
         }
 
+        /// <summary>
+        /// Extract text from Claude API response using simple string parsing
+        /// </summary>
+        private string ExtractTextFromResponse(string jsonResponse)
+        {
+            try
+            {
+                // Look for the text content in the response
+                // This is a simple parser for the expected Claude API response format
+                var serializer = new JavaScriptSerializer();
+                var response = serializer.DeserializeObject(jsonResponse) as Dictionary<string, object>;
+
+                if (response != null && response.ContainsKey("content"))
+                {
+                    var content = response["content"] as object[];
+                    if (content != null && content.Length > 0)
+                    {
+                        var firstContent = content[0] as Dictionary<string, object>;
+                        if (firstContent != null && firstContent.ContainsKey("text"))
+                        {
+                            return firstContent["text"].ToString();
+                        }
+                    }
+                }
+
+                return "Unable to parse response.";
+            }
+            catch (Exception)
+            {
+                return "Error parsing response.";
+            }
+        }
+
         public void Dispose()
         {
             httpClient?.Dispose();
         }
     }
 
-    // Data models for Claude API response
+    // Simple data models for reference (not used with JavaScriptSerializer)
     public class ClaudeResponse
     {
-        [JsonProperty("content")]
         public ClaudeContent[] Content { get; set; }
-
-        [JsonProperty("id")]
         public string Id { get; set; }
-
-        [JsonProperty("model")]
         public string Model { get; set; }
-
-        [JsonProperty("role")]
         public string Role { get; set; }
-
-        [JsonProperty("type")]
         public string Type { get; set; }
-
-        [JsonProperty("usage")]
         public ClaudeUsage Usage { get; set; }
     }
 
     public class ClaudeContent
     {
-        [JsonProperty("text")]
         public string Text { get; set; }
-
-        [JsonProperty("type")]
         public string Type { get; set; }
     }
 
     public class ClaudeUsage
     {
-        [JsonProperty("input_tokens")]
         public int InputTokens { get; set; }
-
-        [JsonProperty("output_tokens")]
         public int OutputTokens { get; set; }
     }
 }
