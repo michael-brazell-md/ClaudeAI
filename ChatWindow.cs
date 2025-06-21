@@ -97,6 +97,8 @@ namespace ClaudeAI
             analysisTypeCombo.Items.Add("Selected Text");
             analysisTypeCombo.Items.Add("Solution Structure");
             analysisTypeCombo.Items.Add("Current Project");
+            analysisTypeCombo.Items.Add("Git Repository Status");
+            analysisTypeCombo.Items.Add("Recent Git Changes");
             analysisTypeCombo.SelectedIndex = 0;
 
             analyzeButton = new Button
@@ -377,6 +379,27 @@ namespace ClaudeAI
                         codeContent = $"Project: {firstProject.Name}\nFiles ({firstProject.Files.Count}):\n" +
                                     string.Join("\n", firstProject.Files.Select(f => $"  - {f.RelativePath} ({f.Language})"));
                         break;
+
+                    case "Git Repository Status":
+                        var gitContext = GitService.GetGitContext();
+                        contextPrompt = "Please analyze the current Git repository status and provide insights about the development workflow, recent changes, and recommendations:";
+                        codeContent = gitContext;
+                        break;
+
+                    case "Recent Git Changes":
+                        var recentFiles = GitService.GetRecentlyChangedFiles(20);
+                        if (recentFiles.Count == 0)
+                        {
+                            AppendToChatDisplay("No recent Git changes found or Git repository not available.\n\n");
+                            return;
+                        }
+                        contextPrompt = "Please analyze these recently changed files in the Git repository and provide insights about recent development activity:";
+                        codeContent = $"Recently changed files:\n{string.Join("\n", recentFiles.Select(f => $"  - {f}"))}";
+
+                        // Add Git context for additional information
+                        var gitInfo = GitService.GetGitContext();
+                        codeContent = $"{gitInfo}\n\n{codeContent}";
+                        break;
                 }
 
                 if (string.IsNullOrEmpty(codeContent))
@@ -477,6 +500,9 @@ namespace ClaudeAI
                 return;
             }
 
+            // Check if message is related to Git/version control and add context if needed
+            var enhancedMessage = EnhanceMessageWithGitContext(message);
+
             // Add user message to chat
             AppendToChatDisplay($"You: {message}\n\n");
 
@@ -491,7 +517,7 @@ namespace ClaudeAI
                 AppendToChatDisplay("Claude is typing...\n");
 
                 // Get response from Claude
-                var response = await apiService.SendMessageAsync(message);
+                var response = await apiService.SendMessageAsync(enhancedMessage);
 
                 // Remove typing indicator and add response
                 var currentText = chatDisplay.Text;
@@ -523,6 +549,38 @@ namespace ClaudeAI
                 messageInput.IsEnabled = true;
                 messageInput.Focus();
             }
+        }
+
+        private string EnhanceMessageWithGitContext(string message)
+        {
+            // Keywords that suggest the user might benefit from Git context
+            var gitKeywords = new[] {
+                "git", "commit", "branch", "merge", "pull", "push", "repository", "repo",
+                "version", "change", "diff", "history", "recent", "latest", "current work",
+                "working on", "in progress", "refactor", "modify", "update", "create file",
+                "new file", "add file"
+            };
+
+            var lowerMessage = message.ToLowerInvariant();
+            var needsGitContext = gitKeywords.Any(keyword => lowerMessage.Contains(keyword));
+
+            if (needsGitContext)
+            {
+                try
+                {
+                    var gitContext = GitService.GetGitContext();
+                    if (!gitContext.StartsWith("Git Status: No") && !gitContext.StartsWith("Git Status: Error"))
+                    {
+                        return $"{gitContext}\n\nUser Question: {message}";
+                    }
+                }
+                catch (Exception)
+                {
+                    // If Git context fails, just use original message
+                }
+            }
+
+            return message;
         }
 
         private void ProcessClaudeResponse(string response)

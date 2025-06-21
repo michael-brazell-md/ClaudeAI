@@ -53,6 +53,7 @@
     <Compile Include="ThemeHelper.cs" />
     <Compile Include="SolutionAnalyzer.cs" />
     <Compile Include="FileManager.cs" />
+    <Compile Include="GitService.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ClaudeAIPackage.cs" />
   </ItemGroup>
