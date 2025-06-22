@@ -47,6 +47,12 @@
   <ItemGroup>
     <Compile Include="ClaudeAICommand.cs" />
     <Compile Include="ChatWindow.cs" />
+    <Compile Include="ChatWindowControl.cs" />
+    <Compile Include="ChatEventHandlers.cs" />
+    <Compile Include="CodeAnalyzer.cs" />
+    <Compile Include="FileUploadHandler.cs" />
+    <Compile Include="PairProgrammingService.cs" />
+    <Compile Include="PairProgrammingPanel.cs" />
     <Compile Include="ApiKeyDialog.cs" />
     <Compile Include="SettingsManager.cs" />
     <Compile Include="ClaudeApiService.cs" />
